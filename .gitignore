@@ -1,0 +1,6 @@
+venv/
+nhanes_raw/
+__pycache__/
+*.pyc
+outputs\*.png
+outputs\*.csv
