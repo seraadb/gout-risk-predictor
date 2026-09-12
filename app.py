@@ -57,13 +57,22 @@ pipeline = bundle["pipeline"]
 model_name = bundle["model_name"]
 
 with st.expander("About this model", expanded=False):
+    other_models = ["Logistic Regression", "Random Forest", "XGBoost",
+                     "LightGBM", "SVM", "Stacking Ensemble"]
+    other_models = [m for m in other_models if m.replace(" ", "") != model_name.replace(" ", "")]
     st.markdown(f"""
-    - **Algorithm:** {model_name}
+    - **Deployed algorithm:** {model_name} (best performer, selected after comparison)
+    - **Also compared during research:** {", ".join(other_models)}
     - **Trained on:** NHANES 2007-2016 (development set)
     - **Temporally validated on:** NHANES 2017-2018 (unseen, later data)
     - **Internal AUC-ROC:** {bundle['internal_auc_roc']:.3f}
     - **Temporal external AUC-ROC:** {bundle['temporal_auc_roc']:.3f}
     - **Baseline gout prevalence in training data:** {bundle['gout_prevalence_dev']*100:.1f}%
+
+    Six machine learning algorithms were trained and internally validated;
+    {model_name} was selected for deployment here because it achieved the
+    best combination of internal cross-validated accuracy and temporal
+    external validation performance.
 
     This tool is for **educational and research demonstration purposes
     only** and is not a substitute for professional medical diagnosis.
