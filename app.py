@@ -9,8 +9,7 @@ USAGE:
     streamlit run app.py
 
 This opens a local link (usually http://localhost:8501) in your browser
-immediately. See the deployment guide for turning this into a public,
-shareable link.
+immediately.
 =============================================================================
 """
 
@@ -19,14 +18,154 @@ import pandas as pd
 import numpy as np
 import joblib
 from pathlib import Path
+from datetime import datetime
 
 st.set_page_config(
     page_title="Gout Risk Predictor",
-    page_icon="\U0001FA78",
-    layout="centered",
+    page_icon="\u2695",
+    layout="wide",
 )
 
 MODEL_PATH = Path("outputs/gout_model.pkl")
+
+# =============================================================================
+# VISUAL IDENTITY
+# Deep ink navy + teal, a serif display face for headings, a clean sans for
+# body/labels. Matches the palette used across the project's slides and
+# paper, so the site, deck, and report read as one consistent project.
+# =============================================================================
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap');
+
+html { font-size: 23px; color-scheme: light only; }
+
+:root {
+    --ink: #0B2027;
+    --teal: #045C64;
+    --teal-light: #028090;
+    --seafoam: #00A896;
+    --paper: #F5F8F7;
+    --line: #D8E3E1;
+    --text: #16302E;
+    --muted: #5C7A76;
+}
+
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; color-scheme: light only; }
+.stApp { background-color: var(--paper) !important; }
+[data-testid="stAppViewContainer"] { background-color: var(--paper) !important; }
+.block-container { padding-top: 2.2rem; padding-left: 3rem; padding-right: 3rem; max-width: 96vw; width: 96vw; }
+
+h1, h2, h3, .serif { font-family: 'Source Serif 4', serif; color: var(--ink); }
+
+#MainMenu, footer, header { visibility: hidden; }
+
+/* ---------------------------------------------------------------- Hero ---- */
+.hero {
+    position: relative;
+    background: var(--ink);
+    border-radius: 14px;
+    padding: 2.6rem 2.6rem 2.1rem 2.6rem;
+    margin-bottom: 2.2rem;
+    box-shadow: 0 12px 32px rgba(11, 32, 39, 0.18);
+}
+@media (max-width: 640px) { .hero { padding: 1.8rem 1.5rem; } }
+
+.hero-datetime {
+    position: absolute;
+    top: 1.6rem;
+    right: 2rem;
+    text-align: right;
+    color: #8FB3AE !important;
+    font-size: 1.05rem;
+    line-height: 1.4;
+}
+@media (max-width: 640px) { .hero-datetime { position: static; text-align: left; margin-bottom: 1rem; } }
+
+.hero-eyebrow { color: var(--seafoam) !important; font-size: 1.15rem; font-weight: 500; margin-bottom: 0.8rem; margin-top: 0.3rem; }
+.hero-title { color: #FFFFFF !important; font-size: 3.4rem; font-weight: 600; line-height: 1.15; margin: 0 0 1rem 0; font-family: 'Source Serif 4', serif; }
+.hero-desc { color: #D7ECE8 !important; font-size: 1.4rem; max-width: 56ch; line-height: 1.55; margin: 0 0 2rem 0; }
+
+.stat-strip { display: flex; flex-wrap: wrap; gap: 0; border-top: 1px solid #1E3A40; padding-top: 1.3rem; }
+.stat-strip .stat { flex: 1 1 0; min-width: 220px; padding: 0 2rem; border-left: 1px solid #1E3A40; }
+.stat-strip .stat:first-child { padding-left: 0; border-left: none; }
+.stat-num { font-family: 'Source Serif 4', serif; font-size: 2.4rem; color: #FFFFFF !important; font-weight: 600; white-space: nowrap; }
+.stat-num-text { font-family: 'Source Serif 4', serif; font-size: 1.7rem; color: #FFFFFF !important; font-weight: 600; white-space: nowrap; }
+.stat-label { color: #9FC6C0 !important; font-size: 1.1rem; line-height: 1.35; margin-top: 0.3rem; }
+
+/* ------------------------------------------------------ Form sections ---- */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background: #FFFFFF !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 12px;
+    padding: 0.4rem 0.7rem 0.7rem 0.7rem;
+    margin-bottom: 1.3rem;
+}
+.section-label { font-family: 'Source Serif 4', serif; font-size: 1.7rem; color: var(--ink) !important; margin: 0.6rem 0 1rem 0.1rem; }
+
+.stButton > button {
+    background: var(--teal);
+    color: white !important;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.85rem 1rem;
+}
+.stButton > button:hover { background: var(--teal-light); color: white !important; }
+.stButton > button p { font-size: 1.3rem !important; }
+
+/* -------------------------------------------------------- Result card ---- */
+.result-card {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 2rem 2.2rem 1.9rem 2.2rem;
+    margin-top: 0.6rem;
+    box-shadow: 0 8px 24px rgba(11, 32, 39, 0.08);
+}
+.result-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.3rem; flex-wrap: wrap; gap: 0.6rem; }
+.result-pct { font-family: 'Source Serif 4', serif; font-size: 4.2rem; color: var(--ink); font-weight: 600; }
+.result-badge { font-size: 1.25rem; font-weight: 600; padding: 0.45rem 1.1rem; border-radius: 20px; align-self: center; }
+.badge-low { background: #DFF3ED; color: #0A6B52; }
+.badge-moderate { background: #FBECD5; color: #92600B; }
+.badge-elevated { background: #FBE1DE; color: #A3341F; }
+
+.gauge-track { position: relative; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #0A6B52 0%, #C7A233 50%, #A3341F 100%); margin: 0.5rem 0 0.6rem 0; }
+.gauge-marker { position: absolute; top: -7px; width: 4px; height: 26px; background: var(--ink); border-radius: 2px; }
+.gauge-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.95rem; }
+
+.footnote { color: var(--muted) !important; font-size: 1.1rem; line-height: 1.6; }
+.precaution-list { margin: 0 0 1rem 0; padding-left: 1.4rem; color: var(--text); font-size: 1.15rem; line-height: 1.75; }
+.precaution-list li { margin-bottom: 0.5rem; }
+
+/* ------------------------------------------------- Widget label sizing --- */
+.block-container label p,
+.block-container [data-testid="stWidgetLabel"] p {
+    color: var(--text) !important;
+    font-size: 1.2rem !important;
+    font-weight: 500;
+}
+.stNumberInput input,
+.stTextInput input,
+.stNumberInput div[data-baseweb="input"],
+.stTextInput div[data-baseweb="input"],
+[data-baseweb="select"] > div,
+[data-baseweb="input"],
+[data-baseweb="base-input"] {
+    background-color: #FCFDFD !important;
+    color: var(--text) !important;
+    border: 1px solid var(--line) !important;
+    font-size: 1.22rem !important;
+}
+[data-baseweb="select"] div { color: var(--text) !important; }
+[data-baseweb="select"] svg { fill: var(--text) !important; }
+[data-baseweb="slider"] [role="slider"] { background-color: var(--teal) !important; border-color: var(--teal) !important; }
+[data-testid="stSliderTickBarMin"], [data-testid="stSliderTickBarMax"] { color: var(--muted) !important; }
+div[data-baseweb="popover"] { background-color: #FFFFFF !important; }
+div[data-baseweb="popover"] li { color: var(--text) !important; background-color: #FFFFFF !important; }
+.streamlit-expanderHeader p { font-size: 1.25rem !important; font-weight: 500; }
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -37,13 +176,6 @@ def load_model():
 
 
 bundle = load_model()
-
-st.title("\U0001FA78 Gout Risk Predictor")
-st.caption(
-    "A machine learning tool estimating gout risk from demographic, "
-    "metabolic, laboratory, and lifestyle factors, trained and temporally "
-    "validated on NHANES survey data (2007-2018)."
-)
 
 if bundle is None:
     st.error(
@@ -56,88 +188,127 @@ if bundle is None:
 pipeline = bundle["pipeline"]
 model_name = bundle["model_name"]
 
-with st.expander("About this model", expanded=False):
+# ---------------------------------------------------------------- Hero ----
+now = datetime.now()
+st.markdown(f"""
+<div class="hero">
+    <div class="hero-datetime">{now.strftime('%A, %B %d, %Y')}<br/>{now.strftime('%I:%M:%S %p')}</div>
+    <div class="hero-eyebrow">Temporal External Validation &middot; NHANES 2007&ndash;2018</div>
+    <div class="hero-title">Gout Risk Predictor</div>
+    <div class="hero-desc">Estimates gout risk from demographic, metabolic, laboratory, and
+    lifestyle factors, using a model trained on a decade of NHANES data and
+    tested, unmodified, on a later, unseen survey cycle.</div>
+    <div class="stat-strip">
+        <div class="stat">
+            <div class="stat-num">{bundle['internal_auc_roc']:.3f}</div>
+            <div class="stat-label">Internal AUC-ROC<br/>(2007&ndash;2016)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-num">{bundle['temporal_auc_roc']:.3f}</div>
+            <div class="stat-label">Temporal external AUC-ROC<br/>(2017&ndash;2018)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-num-text">{model_name}</div>
+            <div class="stat-label">Deployed algorithm<br/>(best of 6 compared)</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+with st.expander("About this model"):
     other_models = ["Logistic Regression", "Random Forest", "XGBoost",
                      "LightGBM", "SVM", "Stacking Ensemble"]
     other_models = [m for m in other_models if m.replace(" ", "") != model_name.replace(" ", "")]
     st.markdown(f"""
-    - **Deployed algorithm:** {model_name} (best performer, selected after comparison)
-    - **Also compared during research:** {", ".join(other_models)}
-    - **Trained on:** NHANES 2007-2016 (development set)
-    - **Temporally validated on:** NHANES 2017-2018 (unseen, later data)
-    - **Internal AUC-ROC:** {bundle['internal_auc_roc']:.3f}
-    - **Temporal external AUC-ROC:** {bundle['temporal_auc_roc']:.3f}
-    - **Baseline gout prevalence in training data:** {bundle['gout_prevalence_dev']*100:.1f}%
+    Six machine learning algorithms were trained and internally validated
+    on NHANES 2007&ndash;2016 (Logistic Regression, Random Forest, XGBoost,
+    LightGBM, SVM, and a Stacking Ensemble). **{model_name}** was selected
+    for deployment here after also comparing all six on a temporal
+    external test set &mdash; NHANES 2017&ndash;2018, a survey cycle none
+    of the models saw during training.
 
-    Six machine learning algorithms were trained and internally validated;
-    {model_name} was selected for deployment here because it achieved the
-    best combination of internal cross-validated accuracy and temporal
-    external validation performance.
+    Algorithms also compared during research: {", ".join(other_models)}.
 
-    This tool is for **educational and research demonstration purposes
-    only** and is not a substitute for professional medical diagnosis.
+    Baseline gout prevalence in the training population was
+    **{bundle['gout_prevalence_dev']*100:.1f}%**.
+
+    This tool is for educational and research demonstration purposes only
+    and is not a substitute for professional medical diagnosis.
     """)
 
-st.divider()
-st.subheader("Enter your information")
+# ------------------------------------------------------------- Form -----
+with st.container(border=True):
+    st.markdown('<div class="section-label">Demographic</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        age = st.number_input("Age (years)", min_value=18, max_value=100, value=45)
+        sex = st.selectbox("Sex", options=[("Male", 1), ("Female", 2)], format_func=lambda x: x[0])[1]
+        race_ethnicity = st.selectbox(
+            "Race/Ethnicity",
+            options=[
+                ("Mexican American", 1), ("Other Hispanic", 2),
+                ("Non-Hispanic White", 3), ("Non-Hispanic Black", 4),
+                ("Non-Hispanic Asian", 6), ("Other/Multi-racial", 7),
+            ],
+            format_func=lambda x: x[0],
+        )[1]
+    with col2:
+        poverty_income = st.slider("Income-to-poverty ratio", 0.0, 5.0, 2.0, 0.1)
+        education = st.selectbox(
+            "Education level",
+            options=[
+                ("Less than 9th grade", 1), ("9-11th grade", 2),
+                ("High school graduate", 3), ("Some college", 4),
+                ("College graduate or above", 5),
+            ],
+            format_func=lambda x: x[0],
+        )[1]
 
-col1, col2 = st.columns(2)
+with st.container(border=True):
+    st.markdown('<div class="section-label">Metabolic</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        bmi = st.number_input("BMI (kg/m\u00b2)", min_value=10.0, max_value=70.0, value=27.0, step=0.1)
+    with col2:
+        waist = st.number_input("Waist circumference (cm)", min_value=40.0, max_value=200.0, value=95.0, step=0.5)
 
-with col1:
-    st.markdown("**Demographic**")
-    age = st.number_input("Age (years)", min_value=18, max_value=100, value=45)
-    sex = st.selectbox("Sex", options=[("Male", 1), ("Female", 2)], format_func=lambda x: x[0])[1]
-    race_ethnicity = st.selectbox(
-        "Race/Ethnicity",
-        options=[
-            ("Mexican American", 1), ("Other Hispanic", 2),
-            ("Non-Hispanic White", 3), ("Non-Hispanic Black", 4),
-            ("Non-Hispanic Asian", 6), ("Other/Multi-racial", 7),
-        ],
-        format_func=lambda x: x[0],
-    )[1]
-    poverty_income = st.slider("Income-to-poverty ratio", 0.0, 5.0, 2.0, 0.1)
-    education = st.selectbox(
-        "Education level",
-        options=[
-            ("Less than 9th grade", 1), ("9-11th grade", 2),
-            ("High school graduate", 3), ("Some college", 4),
-            ("College graduate or above", 5),
-        ],
-        format_func=lambda x: x[0],
-    )[1]
+with st.container(border=True):
+    st.markdown('<div class="section-label">Laboratory</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        uric_acid = st.number_input("Serum uric acid (mg/dL)", min_value=1.0, max_value=15.0, value=5.5, step=0.1)
+        creatinine = st.number_input("Creatinine (mg/dL)", min_value=0.2, max_value=10.0, value=0.9, step=0.1)
+        hdl = st.number_input("HDL cholesterol (mg/dL)", min_value=10.0, max_value=150.0, value=50.0, step=1.0)
+    with col2:
+        ldl = st.number_input("LDL cholesterol (mg/dL)", min_value=10.0, max_value=300.0, value=110.0, step=1.0)
+        fasting_glucose = st.number_input("Fasting glucose (mg/dL)", min_value=50.0, max_value=400.0, value=95.0, step=1.0)
+        triglycerides = st.number_input("Triglycerides (mg/dL)", min_value=20.0, max_value=1000.0, value=120.0, step=1.0)
 
-    st.markdown("**Metabolic**")
-    bmi = st.number_input("BMI (kg/m\u00b2)", min_value=10.0, max_value=70.0, value=27.0, step=0.1)
-    waist = st.number_input("Waist circumference (cm)", min_value=40.0, max_value=200.0, value=95.0, step=0.5)
+with st.container(border=True):
+    st.markdown('<div class="section-label">Comorbidity & Medications</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        hypertension = st.selectbox("Diagnosed with hypertension?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
+        diabetes = st.selectbox("Diagnosed with diabetes?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
+    with col2:
+        diuretic_use = st.selectbox("Currently taking a diuretic?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
+        nsaid_use = st.selectbox("Regularly taking NSAIDs?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
 
-with col2:
-    st.markdown("**Laboratory**")
-    uric_acid = st.number_input("Serum uric acid (mg/dL)", min_value=1.0, max_value=15.0, value=5.5, step=0.1)
-    creatinine = st.number_input("Creatinine (mg/dL)", min_value=0.2, max_value=10.0, value=0.9, step=0.1)
-    hdl = st.number_input("HDL cholesterol (mg/dL)", min_value=10.0, max_value=150.0, value=50.0, step=1.0)
-    ldl = st.number_input("LDL cholesterol (mg/dL)", min_value=10.0, max_value=300.0, value=110.0, step=1.0)
-    fasting_glucose = st.number_input("Fasting glucose (mg/dL)", min_value=50.0, max_value=400.0, value=95.0, step=1.0)
-    triglycerides = st.number_input("Triglycerides (mg/dL)", min_value=20.0, max_value=1000.0, value=120.0, step=1.0)
+with st.container(border=True):
+    st.markdown('<div class="section-label">Lifestyle</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        alcohol_intake = st.number_input("Alcoholic drinks per day (average)", min_value=0.0, max_value=20.0, value=1.0, step=0.5)
+        dietary_fiber = st.number_input("Dietary fiber intake (g/day)", min_value=0.0, max_value=100.0, value=15.0, step=1.0)
+    with col2:
+        physical_activity = st.selectbox("Regular vigorous physical activity?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
+        smoking = st.selectbox("Smoking status", options=[("Never smoked", 2), ("Current/former smoker", 1)], format_func=lambda x: x[0])[1]
 
-    st.markdown("**Comorbidity & Medications**")
-    hypertension = st.selectbox("Diagnosed with hypertension?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
-    diabetes = st.selectbox("Diagnosed with diabetes?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
-    diuretic_use = st.selectbox("Currently taking a diuretic?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
-    nsaid_use = st.selectbox("Regularly taking NSAIDs?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
+st.write("")
+predict_clicked = st.button("Predict gout risk", type="primary", use_container_width=True)
 
-st.markdown("**Lifestyle**")
-col3, col4 = st.columns(2)
-with col3:
-    alcohol_intake = st.number_input("Alcoholic drinks per day (average)", min_value=0.0, max_value=20.0, value=1.0, step=0.5)
-    dietary_fiber = st.number_input("Dietary fiber intake (g/day)", min_value=0.0, max_value=100.0, value=15.0, step=1.0)
-with col4:
-    physical_activity = st.selectbox("Regular vigorous physical activity?", options=[("No", 0), ("Yes", 1)], format_func=lambda x: x[0])[1]
-    smoking = st.selectbox("Smoking status", options=[("Never smoked", 2), ("Current/former smoker", 1)], format_func=lambda x: x[0])[1]
-
-st.divider()
-
-if st.button("Predict gout risk", type="primary", use_container_width=True):
+# ------------------------------------------------------------ Result ----
+if predict_clicked:
     tyg_index = np.log((triglycerides * fasting_glucose) / 2) if triglycerides > 0 and fasting_glucose > 0 else np.nan
 
     input_row = pd.DataFrame([{
@@ -155,25 +326,33 @@ if st.button("Predict gout risk", type="primary", use_container_width=True):
     input_row = input_row[bundle["predictor_columns"]]
 
     risk_prob = float(pipeline.predict_proba(input_row)[0, 1])
-
-    st.subheader("Result")
     risk_pct = risk_prob * 100
 
     if risk_prob < 0.05:
-        risk_level, color = "Low", "green"
+        risk_level, badge_class = "Low", "badge-low"
     elif risk_prob < 0.15:
-        risk_level, color = "Moderate", "orange"
+        risk_level, badge_class = "Moderate", "badge-moderate"
     else:
-        risk_level, color = "Elevated", "red"
+        risk_level, badge_class = "Elevated", "badge-elevated"
 
-    st.metric("Estimated gout risk", f"{risk_pct:.1f}%")
-    st.markdown(f"**Risk category:** :{color}[{risk_level}]")
-    st.progress(min(risk_prob, 1.0))
+    marker_pos = min(max(risk_pct, 0), 100)
 
-    st.caption(
-        f"For comparison, baseline gout prevalence in the training "
-        f"population was {bundle['gout_prevalence_dev']*100:.1f}%."
-    )
+    st.markdown(f"""
+    <div class="result-card">
+        <div class="result-top">
+            <div class="result-pct">{risk_pct:.1f}%</div>
+            <div class="result-badge {badge_class}">{risk_level} risk</div>
+        </div>
+        <div class="gauge-track">
+            <div class="gauge-marker" style="left: calc({marker_pos}% - 2px);"></div>
+        </div>
+        <div class="gauge-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+        <p class="footnote" style="margin-top: 1.1rem;">
+            For comparison, baseline gout prevalence in the training
+            population was {bundle['gout_prevalence_dev']*100:.1f}%.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.info(
         "This is a research/educational estimate based on population "
@@ -182,8 +361,51 @@ if st.button("Predict gout risk", type="primary", use_container_width=True):
         icon="\u2139\ufe0f",
     )
 
-st.divider()
-st.caption(
-    "Temporal External Validation of Machine Learning Models for Gout "
-    "Risk Prediction Using NHANES Data \u2014 Seraa Datta Bhowmik (24BHT0029)"
+    # ------------------------------------------------- Precautions -----
+    general_precautions = [
+        "Limit high-purine foods: red meat, organ meats, and certain "
+        "seafood (sardines, anchovies, mussels, scallops).",
+        "Limit alcohol, especially beer and spirits, which are more "
+        "strongly linked to gout flares than wine.",
+        "Avoid sugary drinks and foods high in fructose/high-fructose "
+        "corn syrup.",
+        "Stay well hydrated with water throughout the day.",
+        "Include low-fat dairy products, which are associated with "
+        "lower gout risk in research.",
+        "Maintain a healthy weight through gradual, sustainable changes "
+        "rather than rapid or crash dieting.",
+        "Get regular, moderate physical activity.",
+    ]
+    elevated_precautions = [
+        "Consult a healthcare provider about checking your serum uric "
+        "acid level and discussing whether urate-lowering therapy is "
+        "appropriate.",
+        "Review current medications with a doctor \u2014 some diuretics "
+        "can raise uric acid levels.",
+        "Ask about managing related conditions (hypertension, diabetes, "
+        "kidney function), which often occur alongside elevated gout risk.",
+    ]
+
+    precaution_items = general_precautions + (elevated_precautions if risk_level == "Elevated" else [])
+    precaution_list_html = "".join(f"<li>{p}</li>" for p in precaution_items)
+
+    st.markdown(f"""
+    <div class="result-card" style="margin-top: 1.2rem;">
+        <div class="section-label" style="margin-top: 0;">Dietary &amp; lifestyle precautions</div>
+        <ul class="precaution-list">{precaution_list_html}</ul>
+        <p class="footnote">
+            These are general, evidence-based precautions associated with
+            lower gout risk in the population, not a personalized
+            treatment plan. Always consult a healthcare professional
+            before making significant dietary or medication changes.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.write("")
+st.markdown(
+    '<p class="footnote">Temporal External Validation of Machine Learning '
+    'Models for Gout Risk Prediction Using NHANES Data &mdash; '
+    'Seraa Datta Bhowmik (24BHT0029)</p>',
+    unsafe_allow_html=True,
 )
