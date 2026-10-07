@@ -17,6 +17,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 
@@ -503,10 +504,8 @@ if predict_clicked:
     </div>
     """, unsafe_allow_html=True)
 
-    # ------------------------------------------------ Nutrition chart ----
+    # ------------------------------------------------ Nutrition pie chart --
     calorie_target = estimate_calorie_target(age, sex, physical_activity == 1)
-    protein_target_g = round((0.15 * calorie_target) / 4)
-    carb_target_g = round((0.55 * calorie_target) / 4)
     fiber_target_g = round(calorie_target / 1000 * 14)
 
     st.write("")
@@ -518,57 +517,96 @@ if predict_clicked:
             f'(rough estimate from age, sex, and activity level only).</p>',
             unsafe_allow_html=True,
         )
-        nutrition_df = pd.DataFrame(
-            {
-                "Recommended": [protein_target_g, carb_target_g, fiber_target_g],
-                "Your reported intake": [np.nan, np.nan, dietary_fiber],
-            },
-            index=["Protein (g)", "Carbohydrates (g)", "Fiber (g)"],
+
+        diet_labels = ["Carbohydrates", "Protein", "Fats", "Fiber", "Vitamins & Minerals"]
+        diet_shares = [45, 20, 25, 5, 5]
+        diet_colors = ["#045C64", "#028090", "#00A896", "#7FB8AE", "#C7A233"]
+
+        fig, ax = plt.subplots(figsize=(4.6, 4.6))
+        fig.patch.set_alpha(0)
+        wedges, texts, autotexts = ax.pie(
+            diet_shares, labels=diet_labels, autopct="%1.0f%%",
+            colors=diet_colors, startangle=90,
+            textprops={"fontsize": 11, "color": "#16302E"},
+            wedgeprops={"edgecolor": "white", "linewidth": 1.5},
         )
-        st.bar_chart(nutrition_df, height=320)
+        for autotext in autotexts:
+            autotext.set_color("white")
+            autotext.set_fontweight("bold")
+        ax.axis("equal")
+        col_a, col_b, col_c = st.columns([1, 2, 1])
+        with col_b:
+            st.pyplot(fig, use_container_width=True)
+
         fiber_gap = dietary_fiber - fiber_target_g
         if fiber_gap < 0:
             fiber_note = (
                 f"Your reported fiber intake is about {abs(fiber_gap):.0f} g/day "
-                "below the estimated target — higher fiber intake has been "
-                "associated with lower gout risk in NHANES-based research."
+                f"below the suggested ~{fiber_target_g} g/day for your calorie "
+                "level — higher fiber intake has been associated with lower "
+                "gout risk in NHANES-based research."
             )
         else:
             fiber_note = (
-                "Your reported fiber intake already meets or exceeds the "
-                "estimated target."
+                f"Your reported fiber intake already meets or exceeds the "
+                f"suggested ~{fiber_target_g} g/day for your calorie level."
             )
         st.markdown(
-            f'<p class="footnote">{fiber_note} Protein and carbohydrate '
-            "targets assume a moderate-protein, higher-complex-carbohydrate "
-            "pattern generally favored for gout risk reduction; limit "
-            "high-purine protein sources and added sugars within the carb "
-            "allowance. These are general estimates, not a personalized "
-            "diet plan — consult a registered dietitian for one.</p>",
+            f'<p class="footnote">{fiber_note} This chart illustrates a '
+            "general, gout-conscious plate composition — moderate protein, "
+            "complex carbohydrates over refined sugar, healthy fats, and "
+            "enough fiber, vitamins, and minerals from vegetables and fruit. "
+            "Limit high-purine protein sources (red/organ meats, certain "
+            "seafood) within the protein share. This is a general "
+            "illustration, not a personalized diet plan — consult a "
+            "registered dietitian for one.</p>",
             unsafe_allow_html=True,
         )
 
-    # ------------------------------------------- Physical activity chart --
+    # ------------------------------------------- Physical activity guide --
     with st.container(border=True):
-        st.markdown('<div class="section-label">Weekly physical activity targets</div>', unsafe_allow_html=True)
-        activity_df = pd.DataFrame(
-            {"Recommended weekly amount": [150, 75, 2]},
-            index=[
-                "Moderate aerobic (min/week)",
-                "Vigorous aerobic (min/week)",
-                "Strength sessions (days/week)",
-            ],
+        st.markdown('<div class="section-label">Recommended physical activities</div>', unsafe_allow_html=True)
+
+        base_exercises = [
+            ("Brisk walking", "30 minutes, most days of the week",
+             "Low-impact aerobic activity; easy on joints and a strong first choice."),
+            ("Swimming / water aerobics", "20–30 minutes, 2–3 times/week",
+             "Minimal joint stress while still building cardiovascular fitness."),
+            ("Cycling (stationary or outdoor)", "20–30 minutes, 3–4 times/week",
+             "Low-impact aerobic option that's gentle on the knees and ankles."),
+            ("Bodyweight strength (squats, lunges, wall push-ups)", "2 sets of 10–15 reps, 2 times/week",
+             "Builds muscle support around joints; skip reps that cause joint pain."),
+            ("Yoga / stretching", "15–20 minutes, daily",
+             "Improves joint mobility and flexibility; go gently around affected joints."),
+        ]
+        higher_impact = [
+            ("Running / jogging", "20–30 minutes, up to 3 times/week",
+             "Higher-impact option for general fitness — best once risk is low and there's no joint pain; avoid during a flare."),
+        ]
+
+        exercises = base_exercises + (higher_impact if risk_level == "Low" else [])
+
+        exercise_html = "".join(
+            f'<li><strong style="color: var(--ink);">{name}</strong> — {freq}<br/>'
+            f'<span style="color: var(--muted); font-size: 1.05rem;">{note}</span></li>'
+            for name, freq, note in exercises
         )
-        st.bar_chart(activity_df, height=320)
+        st.markdown(f'<ul class="precaution-list">{exercise_html}</ul>', unsafe_allow_html=True)
+
+        if risk_level != "Low":
+            st.markdown(
+                '<p class="footnote">Given your estimated risk level, favor the '
+                "low-impact activities above (walking, swimming, cycling, gentle "
+                "strength work, yoga) over running or other high-impact training, "
+                "and avoid exercising an actively inflamed joint during a flare.</p>",
+                unsafe_allow_html=True,
+            )
         st.markdown(
-            '<p class="footnote">General adult activity guidelines: either '
-            "150 minutes/week of moderate aerobic activity (e.g., brisk "
-            "walking) or 75 minutes/week of vigorous aerobic activity (or "
-            "an equivalent mix), plus muscle-strengthening activity on "
-            "2 or more days/week. During an acute gout flare, rest the "
-            "affected joint and resume gradually; low-impact activity "
-            "(walking, swimming, cycling) is generally preferred over "
-            "high-impact training for joint health.</p>",
+            '<p class="footnote">General adult guideline: about 150 minutes/week '
+            "of moderate aerobic activity (or 75 minutes/week of vigorous "
+            "activity), plus muscle-strengthening activity on 2 or more "
+            "days/week. Build up gradually and consult a healthcare "
+            "professional before starting a new exercise routine.</p>",
             unsafe_allow_html=True,
         )
 
