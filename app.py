@@ -563,6 +563,32 @@ if predict_clicked:
             unsafe_allow_html=True,
         )
 
+        st.markdown('<p class="footnote" style="font-weight: 600; color: var(--ink); margin-top: 0.8rem;">Example foods for each category</p>', unsafe_allow_html=True)
+        food_examples = {
+            "Carbohydrates": "Rice, oats, whole wheat roti/bread, potatoes, quinoa",
+            "Protein": "Eggs, chicken, fish (low-purine varieties), lentils/dal, paneer, tofu, low-fat dairy",
+            "Fats": "Olive oil, nuts, seeds, avocado",
+            "Fiber": "Lentils, beans, whole grains, vegetables, fruits with skin",
+            "Vitamins & Minerals": "Leafy greens, citrus fruits, berries, bell peppers, bananas",
+        }
+        food_rows = "".join(
+            f'<li><strong style="color: var(--ink);">{cat}:</strong> {foods}</li>'
+            for cat, foods in food_examples.items()
+        )
+        st.markdown(f'<ul class="precaution-list">{food_rows}</ul>', unsafe_allow_html=True)
+
+        st.markdown('<p class="footnote" style="font-weight: 600; color: var(--ink); margin-top: 0.8rem;">Foods to avoid or limit</p>', unsafe_allow_html=True)
+        foods_to_avoid = [
+            "Red meat and organ meats (liver, kidney) — high in purines.",
+            "High-purine seafood: sardines, anchovies, mussels, scallops, mackerel.",
+            "Beer and spirits — alcohol raises uric acid levels.",
+            "Sugary drinks, fruit juices, and foods with high-fructose corn syrup.",
+            "Refined carbohydrates and added sugars (white bread, pastries, sweets).",
+            "Excess fried or heavily processed foods.",
+        ]
+        avoid_html = "".join(f"<li>{item}</li>" for item in foods_to_avoid)
+        st.markdown(f'<ul class="precaution-list">{avoid_html}</ul>', unsafe_allow_html=True)
+
     # ------------------------------------------- Physical activity guide --
     with st.container(border=True):
         st.markdown('<div class="section-label">Recommended physical activities</div>', unsafe_allow_html=True)
