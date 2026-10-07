@@ -168,6 +168,27 @@ div[data-baseweb="popover"] li { color: var(--text) !important; background-color
 """, unsafe_allow_html=True)
 
 
+def estimate_calorie_target(age, sex, active):
+    """Rough adult daily calorie target, adapted from USDA Dietary
+    Guidelines estimated-calorie-requirement tables (age/sex/activity
+    level only -- no weight collected by this form, so treat as a
+    ballpark, not an individualized prescription)."""
+    if sex == 1:  # Male
+        if age <= 30:
+            return 3000 if active else 2600
+        elif age <= 50:
+            return 2800 if active else 2400
+        else:
+            return 2400 if active else 2200
+    else:  # Female
+        if age <= 30:
+            return 2400 if active else 2000
+        elif age <= 50:
+            return 2200 if active else 1800
+        else:
+            return 2000 if active else 1600
+
+
 @st.cache_resource
 def load_model():
     if not MODEL_PATH.exists():
@@ -361,6 +382,86 @@ if predict_clicked:
         icon="\u2139\ufe0f",
     )
 
+    # ----------------------------------------------------- Caused by ----
+    general_causes = [
+        "Hyperuricemia (chronically elevated blood uric acid) is the "
+        "primary underlying cause of gout; excess uric acid can "
+        "crystallize as monosodium urate in and around joints.",
+        "Reduced kidney excretion of uric acid, including from impaired "
+        "kidney function.",
+        "Obesity and excess body fat, which increase uric acid "
+        "production and reduce its clearance.",
+        "Use of certain medications, particularly diuretics "
+        "(“water pills”), which can raise uric acid levels.",
+        "High alcohol intake, especially beer and spirits.",
+        "A diet high in purines (red meat, organ meats, certain "
+        "seafood) and in fructose or sugary drinks.",
+        "Family history and genetic predisposition affecting how the "
+        "body handles uric acid.",
+        "Other metabolic conditions such as hypertension, insulin "
+        "resistance, and type 2 diabetes, which frequently co-occur "
+        "with hyperuricemia.",
+    ]
+
+    contributing = []
+    if uric_acid >= 6.8:
+        contributing.append(
+            f"Entered serum uric acid ({uric_acid:.1f} mg/dL) is at or "
+            "above 6.8 mg/dL, the solubility threshold above which "
+            "urate crystals can form."
+        )
+    if bmi >= 30:
+        contributing.append(
+            f"Entered BMI ({bmi:.1f} kg/m²) falls in the obese "
+            "range, a well-established gout risk factor."
+        )
+    if diuretic_use == 1:
+        contributing.append(
+            "Current diuretic use was indicated — this medication "
+            "class is known to raise uric acid levels."
+        )
+    if alcohol_intake >= 2:
+        contributing.append(
+            f"Entered alcohol intake ({alcohol_intake:.1f} drinks/day) "
+            "is above moderate levels associated with higher gout risk."
+        )
+    if hypertension == 1:
+        contributing.append(
+            "A hypertension diagnosis was indicated; hypertension "
+            "commonly co-occurs with and compounds hyperuricemia."
+        )
+    if diabetes == 1:
+        contributing.append(
+            "A diabetes diagnosis was indicated; insulin resistance is "
+            "mechanistically linked to reduced uric acid excretion."
+        )
+    if creatinine >= 1.3:
+        contributing.append(
+            f"Entered creatinine ({creatinine:.1f} mg/dL) is on the "
+            "higher side, suggesting reduced kidney clearance of uric "
+            "acid."
+        )
+
+    causes_html = "".join(f"<li>{c}</li>" for c in general_causes)
+    if contributing:
+        contributing_html = "".join(f"<li>{c}</li>" for c in contributing)
+    else:
+        contributing_html = (
+            "<li>None of the major modifiable risk factors captured by "
+            "this form were flagged for the values you entered.</li>"
+        )
+
+    st.markdown(f"""
+    <div class="result-card" style="margin-top: 1.2rem;">
+        <div class="section-label" style="margin-top: 0;">What causes gout?</div>
+        <ul class="precaution-list">{causes_html}</ul>
+        <p class="footnote" style="margin-bottom: 0.6rem; font-weight: 600; color: var(--ink);">
+            Based on your entered values, the following may be contributing:
+        </p>
+        <ul class="precaution-list">{contributing_html}</ul>
+    </div>
+    """, unsafe_allow_html=True)
+
     # ------------------------------------------------- Precautions -----
     general_precautions = [
         "Limit high-purine foods: red meat, organ meats, and certain "
@@ -401,6 +502,75 @@ if predict_clicked:
         </p>
     </div>
     """, unsafe_allow_html=True)
+
+    # ------------------------------------------------ Nutrition chart ----
+    calorie_target = estimate_calorie_target(age, sex, physical_activity == 1)
+    protein_target_g = round((0.15 * calorie_target) / 4)
+    carb_target_g = round((0.55 * calorie_target) / 4)
+    fiber_target_g = round(calorie_target / 1000 * 14)
+
+    st.write("")
+    with st.container(border=True):
+        st.markdown('<div class="section-label">Daily nutrition targets</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="footnote">Estimated calorie need: '
+            f'<strong style="color: var(--ink);">{calorie_target} kcal/day</strong> '
+            f'(rough estimate from age, sex, and activity level only).</p>',
+            unsafe_allow_html=True,
+        )
+        nutrition_df = pd.DataFrame(
+            {
+                "Recommended": [protein_target_g, carb_target_g, fiber_target_g],
+                "Your reported intake": [np.nan, np.nan, dietary_fiber],
+            },
+            index=["Protein (g)", "Carbohydrates (g)", "Fiber (g)"],
+        )
+        st.bar_chart(nutrition_df, height=320)
+        fiber_gap = dietary_fiber - fiber_target_g
+        if fiber_gap < 0:
+            fiber_note = (
+                f"Your reported fiber intake is about {abs(fiber_gap):.0f} g/day "
+                "below the estimated target — higher fiber intake has been "
+                "associated with lower gout risk in NHANES-based research."
+            )
+        else:
+            fiber_note = (
+                "Your reported fiber intake already meets or exceeds the "
+                "estimated target."
+            )
+        st.markdown(
+            f'<p class="footnote">{fiber_note} Protein and carbohydrate '
+            "targets assume a moderate-protein, higher-complex-carbohydrate "
+            "pattern generally favored for gout risk reduction; limit "
+            "high-purine protein sources and added sugars within the carb "
+            "allowance. These are general estimates, not a personalized "
+            "diet plan — consult a registered dietitian for one.</p>",
+            unsafe_allow_html=True,
+        )
+
+    # ------------------------------------------- Physical activity chart --
+    with st.container(border=True):
+        st.markdown('<div class="section-label">Weekly physical activity targets</div>', unsafe_allow_html=True)
+        activity_df = pd.DataFrame(
+            {"Recommended weekly amount": [150, 75, 2]},
+            index=[
+                "Moderate aerobic (min/week)",
+                "Vigorous aerobic (min/week)",
+                "Strength sessions (days/week)",
+            ],
+        )
+        st.bar_chart(activity_df, height=320)
+        st.markdown(
+            '<p class="footnote">General adult activity guidelines: either '
+            "150 minutes/week of moderate aerobic activity (e.g., brisk "
+            "walking) or 75 minutes/week of vigorous aerobic activity (or "
+            "an equivalent mix), plus muscle-strengthening activity on "
+            "2 or more days/week. During an acute gout flare, rest the "
+            "affected joint and resume gradually; low-impact activity "
+            "(walking, swimming, cycling) is generally preferred over "
+            "high-impact training for joint health.</p>",
+            unsafe_allow_html=True,
+        )
 
 st.write("")
 st.markdown(
