@@ -522,19 +522,19 @@ if predict_clicked:
         diet_shares = [45, 20, 25, 5, 5]
         diet_colors = ["#045C64", "#028090", "#00A896", "#7FB8AE", "#C7A233"]
 
-        fig, ax = plt.subplots(figsize=(4.6, 4.6))
+        fig, ax = plt.subplots(figsize=(3.6, 3.6))
         fig.patch.set_alpha(0)
         wedges, texts, autotexts = ax.pie(
             diet_shares, labels=diet_labels, autopct="%1.0f%%",
             colors=diet_colors, startangle=90,
-            textprops={"fontsize": 11, "color": "#16302E"},
+            textprops={"fontsize": 9.5, "color": "#16302E"},
             wedgeprops={"edgecolor": "white", "linewidth": 1.5},
         )
         for autotext in autotexts:
             autotext.set_color("white")
             autotext.set_fontweight("bold")
         ax.axis("equal")
-        col_a, col_b, col_c = st.columns([1, 2, 1])
+        col_a, col_b, col_c = st.columns([1.6, 1.1, 1.6])
         with col_b:
             st.pyplot(fig, use_container_width=True)
 
